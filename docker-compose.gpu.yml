@@ -1,0 +1,23 @@
+services:
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.gpu
+    environment:
+      DEVICE: gpu
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+  worker:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.gpu
+    environment:
+      DEVICE: gpu
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]

@@ -1,0 +1,20 @@
+meta {
+  name: Remove Background
+  type: http
+  seq: 2
+}
+
+post {
+  url: http://localhost:5000/v1/background/remove
+  body: multipartForm
+  auth: inherit
+}
+
+body:multipart-form {
+  image: @file(C:\Users\Administrator\OneDrive\Pictures\Saved Pictures\shikamaru.jpg)
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+}

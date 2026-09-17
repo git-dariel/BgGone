@@ -1,0 +1,12 @@
+FROM nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04
+ENV DEBIAN_FRONTEND=noninteractive PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 U2NET_HOME=/models
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-pip python3-venv && rm -rf /var/lib/apt/lists/*
+WORKDIR /srv
+COPY pyproject.toml ./
+COPY gunicorn.conf.py ./
+COPY removebg_api ./removebg_api
+RUN python3 -m venv /opt/venv && /opt/venv/bin/pip install --no-cache-dir '.[gpu]' && useradd -r -u 10001 app && mkdir -p /models /data && chown -R app:app /models /data
+ENV PATH=/opt/venv/bin:$PATH DEVICE=gpu
+USER app
+EXPOSE 5000
+CMD ["gunicorn", "-c", "gunicorn.conf.py", "removebg_api.wsgi:app"]

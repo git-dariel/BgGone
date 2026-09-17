@@ -1,69 +1,164 @@
-import Image from "next/image";
+import { ArrowDown, ArrowRight, ArrowUpRight, Box, Images, LockKeyhole, ScanFace, WandSparkles } from "lucide-react";
+import Link from "next/link";
+import Workspace from "@/components/workspace";
+import { GITHUB_REPO_URL } from "@/lib/config";
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
+    <main>
+      <section className="hero page-shell">
+        <div className="hero-topline">
+          <span>
+            <span className="signal-dot" /> THE IMAGE STUDIO FOR CLEANER CUTS
+          </span>
+          <span>NO SIGN-UP REQUIRED / 01</span>
+        </div>
+        <div className="hero-copy">
+          <h1>
+            BgGone.
+            <br />
+            <em>Subject first.</em>
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+          <p>
+            Separate the subject from the scene. Make precise edits, swap the backdrop, and take the final image
+            wherever it needs to go.
           </p>
+          <div className="hero-actions">
+            <a className="button button-dark" href="#workspace">
+              Remove a background <ArrowUpRight size={18} />
+            </a>
+            <Link className="text-link" href="/batch">
+              Working with a set? <ArrowRight size={16} />
+            </Link>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
+        <div className="hero-bottomline">
+          <span>
+            <ScanFace size={19} /> Built for people, products, and everything in between.
+          </span>
+          <a href="#workspace" aria-label="Scroll to image workspace">
+            <ArrowDown size={20} />
           </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+          <span>PNG / WEBP / FULL RESOLUTION</span>
         </div>
-      </main>
-    </div>
+      </section>
+      <Workspace />
+      <section className="how-section page-shell">
+        <div className="section-heading">
+          <span className="work-index">02 / THE PROCESS</span>
+          <h2>
+            From cluttered to <em>considered.</em>
+          </h2>
+          <p>Just enough control to get it right. No heavyweight editing suite required.</p>
+        </div>
+        <div className="process-list">
+          <div>
+            <span className="process-number">01</span>
+            <WandSparkles size={27} />
+            <h3>Find the subject</h3>
+            <p>Upload a photo. The API creates a transparent cutout at the original size.</p>
+          </div>
+          <div>
+            <span className="process-number">02</span>
+            <Box size={27} />
+            <h3>Set the scene</h3>
+            <p>Keep it clear, pick a color, add your own image, or blur what was there.</p>
+          </div>
+          <div>
+            <span className="process-number">03</span>
+            <Images size={27} />
+            <h3>Take it further</h3>
+            <p>Fine-tune the mask and export a clean PNG or compact WebP.</p>
+          </div>
+        </div>
+      </section>
+      <section className="feature-band">
+        <div className="feature-band-inner page-shell">
+          <div>
+            <span className="mini-label">MORE THAN ONE IMAGE?</span>
+            <h2>
+              One queue.
+              <br />
+              <em>Every cut.</em>
+            </h2>
+            <p>Process a set asynchronously and download the finished images together in a ZIP.</p>
+            <Link href="/batch" className="button button-accent">
+              Open batch studio <ArrowUpRight size={17} />
+            </Link>
+          </div>
+          <div className="batch-graphic" aria-hidden="true">
+            <span>
+              01 <i />
+            </span>
+            <span>
+              02 <i />
+            </span>
+            <span>
+              03 <i />
+            </span>
+            <div className="batch-graphic-result">
+              <CheckIcon /> ZIP READY
+            </div>
+          </div>
+        </div>
+      </section>
+      <section className="closing-grid page-shell">
+        <div className="closing-cell">
+          <LockKeyhole size={27} />
+          <span className="mini-label">PRIVACY, PLAINLY</span>
+          <h2>
+            Your images,
+            <br />
+            your call.
+          </h2>
+          <p>
+            A single image is processed in memory. Batch files are kept temporarily and expire automatically. Host the
+            API yourself if you need complete control.
+          </p>
+          <Link href="/self-host">
+            Self-hosting guide <ArrowUpRight size={17} />
+          </Link>
+        </div>
+        <div className="closing-cell">
+          <span className="api-glyph">{`{ }`}</span>
+          <span className="mini-label">BUILT FOR DEVELOPERS</span>
+          <h2>
+            Make it part
+            <br />
+            of your flow.
+          </h2>
+          <p>
+            Use the same endpoints behind this studio in your own product. Image edits, masks, batch jobs, and keys are
+            documented.
+          </p>
+          <Link href="/api">
+            Explore the API <ArrowUpRight size={17} />
+          </Link>
+        </div>
+      </section>
+      {GITHUB_REPO_URL && (
+        <section className="open-source-strip page-shell">
+          <span>OPEN SOURCE / SELF-HOSTABLE</span>
+          <p>Run the stack on your terms, contribute a fix, or take a closer look at the code.</p>
+          <a href={GITHUB_REPO_URL} target="_blank" rel="noopener noreferrer">
+            View the repository <ArrowUpRight size={16} />
+          </a>
+        </section>
+      )}
+    </main>
+  );
+}
+
+function CheckIcon() {
+  return (
+    <svg width="17" height="17" viewBox="0 0 17 17" fill="none" aria-hidden="true">
+      <path
+        d="m3 9 3.4 3.4L14 4.8"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   );
 }

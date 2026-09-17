@@ -1,0 +1,192 @@
+openapi: 3.0.3
+info:
+  title: BgGone API
+  version: 1.0.0
+  description: Image processing API. Authentication is optional for public processing and required for key management.
+servers:
+  - url: http://localhost:5000/v1
+security:
+  - {}
+  - ApiKey: []
+paths:
+  /health:
+    get:
+      summary: Liveness check
+      responses:
+        '200': {description: Running}
+  /ready:
+    get:
+      summary: Model readiness check
+      responses:
+        '200': {description: Model loaded}
+        '503': {description: Model unavailable}
+  /background/remove:
+    post:
+      summary: Remove the background
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/ImageRequest'
+      responses:
+        '200':
+          description: Transparent image
+          headers:
+            X-Processing-Duration-Ms: {schema: {type: integer}}
+          content:
+            image/png: {schema: {type: string, format: binary}}
+            image/webp: {schema: {type: string, format: binary}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '413': {$ref: '#/components/responses/TooLarge'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /mask:
+    post:
+      summary: Generate a grayscale subject mask
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ImageRequest'
+                - type: object
+                  properties:
+                    threshold: {type: number, minimum: 0, maximum: 1, default: 0}
+                    feather: {type: number, minimum: 0, maximum: 20, default: 0}
+                    smooth: {type: integer, minimum: 0, maximum: 5, default: 0}
+      responses:
+        '200': {description: Grayscale PNG, content: {image/png: {schema: {type: string, format: binary}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+  /background/replace:
+    post:
+      summary: Replace the background
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ImageRequest'
+                - type: object
+                  properties:
+                    background: {type: string, enum: [transparent, color, image], default: transparent}
+                    color: {type: string, pattern: '^#[0-9a-fA-F]{6}$', example: '#ffffff'}
+                    background_image: {type: string, format: binary}
+                    cutout: {type: string, format: binary, description: Optional transparent PNG or WebP with the same dimensions as image; skips model inference}
+                    opacity: {type: number, minimum: 0, maximum: 1, default: 1}
+                    brightness: {type: number, minimum: 0, maximum: 3, default: 1}
+      responses:
+        '200': {description: Edited image, content: {image/png: {schema: {type: string, format: binary}}, image/webp: {schema: {type: string, format: binary}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+  /background/blur:
+    post:
+      summary: Blur the original background
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              allOf:
+                - $ref: '#/components/schemas/ImageRequest'
+                - type: object
+                  properties:
+                    intensity: {type: number, minimum: 0, maximum: 80, default: 12}
+                    cutout: {type: string, format: binary, description: Optional transparent PNG or WebP with the same dimensions as image; skips model inference}
+                    opacity: {type: number, minimum: 0, maximum: 1, default: 1}
+                    brightness: {type: number, minimum: 0, maximum: 3, default: 1}
+      responses:
+        '200': {description: Edited image, content: {image/png: {schema: {type: string, format: binary}}, image/webp: {schema: {type: string, format: binary}}}}
+        '400': {$ref: '#/components/responses/BadRequest'}
+  /batch:
+    post:
+      summary: Submit images for asynchronous processing
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [images]
+              properties:
+                images: {type: array, items: {type: string, format: binary}}
+      responses:
+        '202':
+          description: Batch queued
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/BatchAccepted'}
+              example: {id: 4c882e29-3d6b-449a-8ffb-c6a7a5c4d764, status: queued}
+        '400': {$ref: '#/components/responses/BadRequest'}
+        '503': {$ref: '#/components/responses/Unavailable'}
+  /batch/{id}:
+    parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+    get:
+      summary: Poll batch status and per-image results
+      responses:
+        '200': {description: Batch status, content: {application/json: {schema: {$ref: '#/components/schemas/BatchStatus'}}}}
+        '404': {$ref: '#/components/responses/NotFound'}
+    delete:
+      summary: Cancel a queued or running batch
+      responses:
+        '200': {description: Canceled}
+        '409': {description: Already finished}
+  /batch/{id}/download:
+    parameters: [{name: id, in: path, required: true, schema: {type: string, format: uuid}}]
+    get:
+      summary: Download results ZIP
+      responses:
+        '200': {description: ZIP of successful images, content: {application/zip: {schema: {type: string, format: binary}}}}
+        '409': {description: Batch not ready}
+  /keys:
+    post:
+      summary: Create API key; secret returned once
+      security: [{AdminToken: []}]
+      responses:
+        '201': {description: New key, content: {application/json: {schema: {type: object, properties: {id: {type: string}, api_key: {type: string}}}}}}
+        '401': {description: Invalid admin token}
+  /keys/{id}:
+    parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+    delete:
+      summary: Revoke API key
+      security: [{AdminToken: []}]
+      responses:
+        '204': {description: Revoked}
+        '404': {$ref: '#/components/responses/NotFound'}
+  /keys/{id}/usage:
+    parameters: [{name: id, in: path, required: true, schema: {type: string}}]
+    get:
+      summary: Read current month usage
+      security: [{AdminToken: []}]
+      responses:
+        '200': {description: Usage counters, content: {application/json: {schema: {type: object}}}}
+        '404': {$ref: '#/components/responses/NotFound'}
+components:
+  securitySchemes:
+    ApiKey: {type: apiKey, in: header, name: X-API-Key}
+    AdminToken: {type: apiKey, in: header, name: X-Admin-Token}
+  schemas:
+    ImageRequest:
+      type: object
+      required: [image]
+      properties:
+        image: {type: string, format: binary, description: "JPG, PNG or WebP"}
+        format: {type: string, enum: [png, webp], default: png}
+        quality: {type: integer, minimum: 1, maximum: 100, default: 90, description: WebP only}
+        feather: {type: number, minimum: 0, maximum: 20, default: 0}
+    BatchAccepted:
+      type: object
+      properties: {id: {type: string, format: uuid}, status: {type: string}}
+    BatchStatus:
+      type: object
+      properties:
+        status: {type: string, enum: [queued, processing, complete, failed, canceled]}
+        items: {type: array, items: {type: object, properties: {filename: {type: string}, status: {type: string}, output: {type: string}, error: {type: string}, duration_ms: {type: integer}}}}
+    Error:
+      type: object
+      properties: {error: {type: object, properties: {code: {type: string}, message: {type: string}}}, request_id: {type: string}}
+  responses:
+    BadRequest: {description: Invalid upload or parameter, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+    TooLarge: {description: Upload too large, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+    NotFound: {description: Resource not found, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}
+    Unavailable: {description: Model or queue unavailable, content: {application/json: {schema: {$ref: '#/components/schemas/Error'}}}}

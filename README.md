@@ -1,36 +1,28 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# BgGone
 
-## Getting Started
+Next.js image studio with a Flask background removal API. The studio supports single images, edge masks, background edits, WebP and PNG export, batch ZIP jobs, and API key management.
 
-First, run the development server:
+## Start locally
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
+The frontend and API run as separate processes. From the repository root:
+
+```powershell
+pnpm install
 pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open `http://localhost:3000`. The frontend expects the API at `http://localhost:5000/v1`. To change it, copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_API_BASE_URL`, or enter another URL on the self-hosting page. Start the API using [api/README.md](api/README.md). Batch jobs also require Redis and an RQ worker; Docker Compose starts the whole backend stack.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+The browser sends images directly to the API. Set `ALLOWED_ORIGINS` on the API to the frontend origin when hosting them separately. `NEXT_PUBLIC_` values are visible in the browser; never put `ADMIN_TOKEN` in them. Enter the admin token in the API key desk only when managing keys.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Check the frontend
 
-## Learn More
+```powershell
+pnpm lint
+pnpm test:unit
+pnpm build
+pnpm exec playwright install chromium
+pnpm test:e2e
+```
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Browser tests use a built frontend on port 3100 and stub image processing responses; the backend does not need to be running. The API contract is in [api/openapi.yaml](api/openapi.yaml). Implementation progress is tracked in [orchestrator/TODO_FRONTEND.md](orchestrator/TODO_FRONTEND.md) and [orchestrator/TODO_API.md](orchestrator/TODO_API.md).

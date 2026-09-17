@@ -1,0 +1,57 @@
+services:
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.cpu
+    env_file: ./api/.env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      DATABASE_PATH: /data/keys.sqlite3
+      BATCH_DIRECTORY: /data/batches
+    ports:
+      - "5000:5000"
+    volumes:
+      - model-cache:/models
+      - api-data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/v1/ready', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 180s
+
+  worker:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.cpu
+    command: ["python", "-m", "removebg_api.worker"]
+    env_file: ./api/.env
+    environment:
+      REDIS_URL: redis://redis:6379/0
+      DATABASE_PATH: /data/keys.sqlite3
+      BATCH_DIRECTORY: /data/batches
+    volumes:
+      - model-cache:/models
+      - api-data:/data
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  model-cache:
+  api-data:
+  redis-data:

@@ -1,0 +1,10 @@
+FROM python:3.12-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 U2NET_HOME=/models
+WORKDIR /srv
+COPY pyproject.toml ./
+COPY gunicorn.conf.py ./
+COPY removebg_api ./removebg_api
+RUN pip install --no-cache-dir '.[cpu]' && useradd -r -u 10001 app && mkdir -p /models /data && chown -R app:app /models /data
+USER app
+EXPOSE 5000
+CMD ["gunicorn", "-c", "gunicorn.conf.py", "removebg_api.wsgi:app"]
