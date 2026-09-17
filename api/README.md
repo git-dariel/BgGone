@@ -28,7 +28,7 @@ docker compose up --build
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
 ```
 
-The API listens on port 5000. The CPU and GPU images use the appropriate `rembg` extra. See [rembg's installation guide](https://github.com/danielgatis/rembg#installation) for CUDA and ONNX Runtime compatibility. `MODEL` accepts `u2net`, `isnet`, `birefnet`, `birefnet-lite`, or `birefnet-portrait`. The default `birefnet-lite` model is a smaller BiRefNet variant that keeps a soft alpha mask. It may miss fine strands that `birefnet-portrait` retains, so compare both on representative photos before deployment. `EDGE_REFINEMENT=auto` applies alpha matting to U2Net and preserves the soft alpha from newer models. Restart the API and worker after changing these settings; a new model downloads weights on first use. Set `MODEL=birefnet-portrait` in `api/.env` to restore the previous portrait model. `DEVICE=gpu` fails readiness if CUDA is not available. Set `ALLOWED_ORIGINS` to a comma-separated list of trusted frontend origins. The frontend uses `NEXT_PUBLIC_API_BASE_URL=http://localhost:5000/v1` by default.
+The API listens on port 5000. The CPU and GPU images use the appropriate `rembg` extra. See [rembg's installation guide](https://github.com/danielgatis/rembg#installation) for CUDA and ONNX Runtime compatibility. `MODEL` accepts `u2netp`, `u2net`, `isnet`, `birefnet`, `birefnet-lite`, or `birefnet-portrait`. The default `u2netp` model is the smallest option for memory-limited CPU hosts. Its direct ONNX path retains a soft mask with a 512-pixel input cap and avoids the memory cost of closed-form alpha matting. `EDGE_REFINEMENT=alpha` is unavailable with `u2netp`. It can still miss fine strands and must be checked against real portraits. BiRefNet models usually retain more detail but need substantially more memory. Restart the API and worker after changing these settings; a new model downloads weights on first use. `DEVICE=gpu` fails readiness if CUDA is not available. Set `ALLOWED_ORIGINS` to a comma-separated list of trusted frontend origins. The frontend uses `NEXT_PUBLIC_API_BASE_URL=http://localhost:5000/v1` by default.
 
 ## API calls
 
@@ -82,7 +82,7 @@ The secret is shown once. Send it in `X-API-Key`. Anonymous requests are rate li
 
 ## Limits and responses
 
-Defaults are 12 MiB per image, 25 million pixels per image, 10 images per batch, 2 concurrent model calls per API process, 100 queued batches, 120 seconds per image, and 1 hour batch retention. `MAX_INFERENCE_SIDE` scales model input down and restores the mask to original dimensions. U2Net alpha matting is capped at a 1024-pixel working side to keep CPU costs bounded unless `MAX_INFERENCE_SIDE=0`, which disables downscaling. Gunicorn and RQ enforce request/job timeouts. Large or malformed uploads return JSON errors. Processing errors use the same shape:
+Defaults are 12 MiB per image, 25 million pixels per image, 10 images per batch, 1 concurrent model call per API process, 100 queued batches, 120 seconds per image, and 1 hour batch retention. `MAX_INFERENCE_SIDE` scales model input down and restores the mask to original dimensions. U2NetP input is capped at 512 pixels and U2Net alpha matting at 1024 pixels unless `MAX_INFERENCE_SIDE=0`, which disables downscaling. Gunicorn and RQ enforce request/job timeouts. Large or malformed uploads return JSON errors. Processing errors use the same shape:
 
 ```json
 {"error":{"code":"invalid_image","message":"Image cannot be decoded"},"request_id":"..."}

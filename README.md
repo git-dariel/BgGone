@@ -71,7 +71,7 @@ This starts the API on port 5000, an RQ worker, and Redis. It does not start the
 | Setting | Location | Purpose |
 | --- | --- | --- |
 | `NEXT_PUBLIC_API_BASE_URL` | `.env.local` | Browser-accessible API base URL, including `/v1`; defaults to `http://localhost:5000/v1` |
-| `MODEL` | `api/.env` | Segmentation model; defaults to `birefnet-lite` |
+| `MODEL` | `api/.env` | Segmentation model; defaults to `u2netp` for small CPU hosts |
 | `DEVICE` | `api/.env` | `cpu` or `gpu` |
 | `EDGE_REFINEMENT` | `api/.env` | `auto`, `alpha`, or `none` |
 | `ALLOWED_ORIGINS` | `api/.env` | Comma-separated frontend origins allowed by API CORS |
@@ -79,7 +79,7 @@ This starts the API on port 5000, an RQ worker, and Redis. It does not start the
 
 The API loads `api/.env` automatically; shell environment variables take precedence. Restart the API after changing its settings. `NEXT_PUBLIC_` values are exposed to the browser, so keep `ADMIN_TOKEN` and other secrets in the API environment. See [.env.example](.env.example) and [api/.env.example](api/.env.example) for the full setting lists.
 
-`birefnet-lite` is the smaller default model. `birefnet-portrait` generally gives more detail on portraits but needs more resources. `u2net`, `isnet`, and `birefnet` are also supported. Compare outputs on representative images before choosing a production model; fine hair and fur quality depends on the photo. The local model setting applies to initial removal and to API edits that do not include a cutout.
+`u2netp` is the smallest supported model. Its direct ONNX path keeps a soft grayscale mask without importing rembg's memory-heavy alpha matting pipeline. Model input is capped at 512 pixels on its longest side. It needs less memory than the BiRefNet models, but can miss fine strands and does not guarantee that every 512 MB dyno will stay within its quota. `EDGE_REFINEMENT=alpha` is unavailable with `u2netp`. `birefnet-lite` and `birefnet-portrait` provide more detail when enough memory is available. `u2net`, `isnet`, and `birefnet` are also supported. Compare outputs on representative images before choosing a production model; fine hair and fur quality depends on the photo. The local model setting applies to initial removal and to API edits that do not include a cutout.
 
 ## Data handling
 
@@ -137,6 +137,14 @@ curl.exe https://YOUR_API_APP.herokuapp.com/v1/health
 ```
 
 Then set `NEXT_PUBLIC_API_BASE_URL=https://YOUR_API_APP.herokuapp.com/v1` on the existing frontend Heroku app and redeploy the frontend from GitHub so Next.js rebuilds its browser bundle. The value must use the actual API app name, with no angle brackets. If the Self-host page has a saved URL, update it there too; that browser setting takes precedence. Keep `ADMIN_TOKEN` and other secrets in the API app's Heroku config vars, rather than committing `api/.env`.
+
+For a memory-limited API dyno, deploy the current API code and set its model settings explicitly. Heroku config vars override the defaults in code, and the ignored local `api/.env` is not deployed:
+
+```powershell
+heroku config:set MODEL=u2netp EDGE_REFINEMENT=auto MAX_INFERENCE_SIDE=512 MAX_CONCURRENT_INFERENCE=1 -a YOUR_API_APP
+```
+
+This keeps the small model's soft alpha mask but trades away some fine hair detail. Measure real photos and check for `R15` memory errors before relying on a 512 MB dyno.
 
 The current single-image removal endpoint processes synchronously. On CPU, model inference can exceed hosting request limits. Heroku, for example, requires an initial response within [30 seconds](https://devcenter.heroku.com/articles/request-timeout). The API Gunicorn configuration reads Heroku's [`$PORT`](https://devcenter.heroku.com/articles/container-registry-and-runtime) when present. A Heroku deployment still needs a separately deployed API and, for slow inference, an asynchronous single-image job flow or sufficiently fast hardware and model settings. Background edits that reuse a cutout avoid another inference pass, but the initial removal still runs the model.
 

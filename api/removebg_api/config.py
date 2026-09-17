@@ -11,15 +11,15 @@ def _boolean(name: str, default: bool) -> bool:
 
 @dataclass(frozen=True)
 class Settings:
-    model: str = "birefnet-lite"
+    model: str = "u2netp"
     device: str = "cpu"
     edge_refinement: str = "auto"
     warm_model: bool = True
     max_upload_mb: int = 12
     max_image_pixels: int = 25_000_000
-    max_inference_side: int = 2048
+    max_inference_side: int = 512
     max_batch_size: int = 10
-    max_concurrent_inference: int = 2
+    max_concurrent_inference: int = 1
     batch_retention_seconds: int = 3600
     redis_url: str = "redis://localhost:6379/0"
     database_path: str = "./data/keys.sqlite3"
@@ -46,12 +46,14 @@ class Settings:
             else:
                 values[name] = raw
         settings = cls(**values)
-        if settings.model not in {"u2net", "isnet", "birefnet", "birefnet-lite", "birefnet-portrait"}:
-            raise ValueError("MODEL must be u2net, isnet, birefnet, birefnet-lite, or birefnet-portrait")
+        if settings.model not in {"u2net", "u2netp", "isnet", "birefnet", "birefnet-lite", "birefnet-portrait"}:
+            raise ValueError("MODEL must be u2net, u2netp, isnet, birefnet, birefnet-lite, or birefnet-portrait")
         if settings.device not in {"cpu", "gpu"}:
             raise ValueError("DEVICE must be cpu or gpu")
         if settings.edge_refinement not in {"auto", "alpha", "none"}:
             raise ValueError("EDGE_REFINEMENT must be auto, alpha, or none")
+        if settings.model == "u2netp" and settings.edge_refinement == "alpha":
+            raise ValueError("EDGE_REFINEMENT=alpha is not supported with u2netp")
         if settings.max_upload_mb < 1 or settings.max_batch_size < 1:
             raise ValueError("Upload and batch limits must be positive")
         return settings

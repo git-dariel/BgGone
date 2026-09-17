@@ -12,11 +12,12 @@ from removebg_api.models import (
     BiRefNetPortraitAdapter,
     ISNetAdapter,
     U2NetAdapter,
+    U2NetPAdapter,
 )
 
 
 def test_adapter_names():
-    assert [cls("cpu").model_name for cls in (U2NetAdapter, ISNetAdapter, BiRefNetAdapter, BiRefNetLiteAdapter, BiRefNetPortraitAdapter)] == ["u2net", "isnet-general-use", "birefnet-general", "birefnet-general-lite", "birefnet-portrait"]
+    assert [cls("cpu").model_name for cls in (U2NetAdapter, U2NetPAdapter, ISNetAdapter, BiRefNetAdapter, BiRefNetLiteAdapter, BiRefNetPortraitAdapter)] == ["u2net", "u2netp", "isnet-general-use", "birefnet-general", "birefnet-general-lite", "birefnet-portrait"]
 
 
 def test_u2net_uses_matted_alpha_instead_of_raw_mask(monkeypatch):
@@ -35,6 +36,27 @@ def test_u2net_uses_matted_alpha_instead_of_raw_mask(monkeypatch):
     assert mask.getpixel((0, 0)) == 96
     assert calls[0]["alpha_matting"] is True
     assert calls[0].get("only_mask") is not True
+
+
+def test_u2netp_keeps_soft_mask_without_loading_rembg(monkeypatch):
+    import numpy as np
+
+    class FakeSession:
+        def get_inputs(self):
+            return [SimpleNamespace(name="input.1")]
+
+        def run(self, _outputs, values):
+            assert values["input.1"].shape == (1, 3, 320, 320)
+            prediction = np.zeros((1, 1, 320, 320), dtype=np.float32)
+            prediction[0, 0, :, 160:] = 0.5
+            prediction[0, 0, 0, 0] = 1
+            return [prediction]
+
+    adapter = U2NetPAdapter("cpu")
+    monkeypatch.setattr(adapter, "load", lambda: FakeSession())
+    mask = adapter.predict(Image.new("RGB", (320, 320)))
+    assert mask.mode == "L"
+    assert 0 < mask.getpixel((240, 160)) < 255
 
 
 @pytest.mark.parametrize("adapter_class", [BiRefNetLiteAdapter, BiRefNetPortraitAdapter])
@@ -80,6 +102,20 @@ def test_u2net_matte_input_is_bounded_for_cpu():
     service.adapter.predict = predict
     mask, _ = service.mask(Image.new("RGB", (1500, 750)))
     assert sizes == [(1024, 512)]
+    assert mask.size == (1500, 750)
+
+
+def test_u2netp_input_is_bounded_for_basic_dyno():
+    service = BackgroundRemovalService("u2netp", "cpu", 2048, 1)
+    sizes = []
+
+    def predict(image):
+        sizes.append(image.size)
+        return Image.new("L", image.size, 128)
+
+    service.adapter.predict = predict
+    mask, _ = service.mask(Image.new("RGB", (1500, 750)))
+    assert sizes == [(512, 256)]
     assert mask.size == (1500, 750)
 
 

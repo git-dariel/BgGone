@@ -1,7 +1,9 @@
 import logging
+import os
 import threading
 import time
 from abc import ABC, abstractmethod
+from pathlib import Path
 
 from PIL import Image
 
@@ -9,6 +11,7 @@ from .errors import APIError
 
 MODEL_NAMES = {
     "u2net": "u2net",
+    "u2netp": "u2netp",
     "isnet": "isnet-general-use",
     "birefnet": "birefnet-general",
     "birefnet-lite": "birefnet-general-lite",
@@ -74,6 +77,71 @@ class U2NetAdapter(ModelAdapter):
     model_name = MODEL_NAMES["u2net"]
 
 
+class U2NetPAdapter(ModelAdapter):
+    model_name = MODEL_NAMES["u2netp"]
+
+    def load(self):
+        if self._session is None:
+            with self._lock:
+                if self._session is None:
+                    try:
+                        import onnxruntime as ort
+                        import pooch
+
+                        home = os.getenv("U2NET_HOME") or os.getenv("REMBG_HOME") or str(Path.home() / ".rembg")
+                        model_dir = Path(home) / "models" / "u2netp"
+                        model_path = pooch.retrieve(
+                            "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx",
+                            known_hash="sha256:309c8469258dda742793dce0ebea8e6dd393174f89934733ecc8b14c76f4ddd8",
+                            fname="u2netp.onnx",
+                            path=model_dir,
+                            progressbar=False,
+                        )
+                        providers = ["CPUExecutionProvider"]
+                        if self.device == "gpu":
+                            if "CUDAExecutionProvider" not in ort.get_available_providers():
+                                raise RuntimeError("CUDAExecutionProvider is unavailable")
+                            providers.insert(0, "CUDAExecutionProvider")
+                        options = ort.SessionOptions()
+                        options.intra_op_num_threads = 1
+                        options.inter_op_num_threads = 1
+                        options.enable_mem_pattern = False
+                        options.enable_cpu_mem_arena = False
+                        self._session = ort.InferenceSession(
+                            model_path, sess_options=options, providers=providers
+                        )
+                    except Exception as exc:
+                        log.exception("U2NetP model loading failed")
+                        raise APIError("model_unavailable", "Model could not be loaded", 503) from exc
+        return self._session
+
+    def predict(self, image: Image.Image) -> Image.Image:
+        try:
+            import numpy as np
+
+            session = self.load()
+            resized = image.convert("RGB").resize((320, 320), Image.Resampling.LANCZOS)
+            pixels = np.asarray(resized, dtype=np.float32)
+            pixels /= max(float(pixels.max()), 1e-6)
+            pixels -= np.array((0.485, 0.456, 0.406), dtype=np.float32)
+            pixels /= np.array((0.229, 0.224, 0.225), dtype=np.float32)
+            batch = np.expand_dims(pixels.transpose((2, 0, 1)), 0)
+            prediction = session.run(None, {session.get_inputs()[0].name: batch})[0][0, 0]
+            minimum = float(prediction.min())
+            maximum = float(prediction.max())
+            if maximum > minimum:
+                prediction = (prediction - minimum) / (maximum - minimum)
+            else:
+                prediction = np.zeros_like(prediction)
+            mask = Image.fromarray((prediction * 255).astype(np.uint8), "L")
+            return mask.resize(image.size, Image.Resampling.LANCZOS)
+        except APIError:
+            raise
+        except Exception as exc:
+            log.exception("U2NetP inference failed")
+            raise APIError("inference_failed", "Image inference failed", 503) from exc
+
+
 class ISNetAdapter(ModelAdapter):
     model_name = MODEL_NAMES["isnet"]
 
@@ -92,6 +160,7 @@ class BiRefNetPortraitAdapter(ModelAdapter):
 
 ADAPTERS = {
     "u2net": U2NetAdapter,
+    "u2netp": U2NetPAdapter,
     "isnet": ISNetAdapter,
     "birefnet": BiRefNetAdapter,
     "birefnet-lite": BiRefNetLiteAdapter,
@@ -112,7 +181,9 @@ class BackgroundRemovalService:
         try:
             source = image.copy()
             side = self.max_side
-            if side and self.adapter.uses_alpha_matting:
+            if side and self.adapter.model_name == "u2netp":
+                side = min(side, 512)
+            elif side and self.adapter.uses_alpha_matting:
                 # Full-resolution closed-form matting is very expensive on CPU.
                 side = min(side, 1024)
             if side and max(source.size) > side:
