@@ -123,7 +123,20 @@ The browser tests start the built frontend on port 3100 and stub API image respo
 
 ## Deployment considerations
 
-Deploy the frontend and API as separate services and set `NEXT_PUBLIC_API_BASE_URL` and `ALLOWED_ORIGINS` to their public URLs. Use a persistent model cache if the platform discards local files on restart. The Docker Compose setup is intended for local use; adapt storage, secrets, and worker capacity to the deployment target.
+Deploy the frontend and API as separate services and set `NEXT_PUBLIC_API_BASE_URL` and `ALLOWED_ORIGINS` to their public URLs. For Heroku, set `NEXT_PUBLIC_API_BASE_URL` on the frontend app to the actual API URL, such as `https://your-api-app.herokuapp.com/v1`; do not leave the `<api-host>` placeholder. Set it before building the frontend and rebuild after changing it, because Next.js embeds `NEXT_PUBLIC_` values in the browser bundle at build time. A URL saved on the Self-host page overrides this value for that browser. Use a persistent model cache if the platform discards local files on restart. The Docker Compose setup is intended for local use; adapt storage, secrets, and worker capacity to the deployment target.
+
+To deploy the CPU API to a second Heroku app, commit the API changes, install the Heroku CLI, log in, and run these commands from the repository root. Replace `YOUR_API_APP` with an available Heroku app name. The `api/heroku.yml` manifest is at the root of the API subtree when pushed, so Heroku builds `Dockerfile.cpu` for that app.
+
+```powershell
+heroku login
+heroku create YOUR_API_APP --stack container
+heroku git:remote -a YOUR_API_APP -r heroku-api
+heroku config:set ALLOWED_ORIGINS=https://bggone-05ba01f79fe8.herokuapp.com WARM_MODEL=false -a YOUR_API_APP
+git subtree push --prefix api heroku-api main
+curl.exe https://YOUR_API_APP.herokuapp.com/v1/health
+```
+
+Then set `NEXT_PUBLIC_API_BASE_URL=https://YOUR_API_APP.herokuapp.com/v1` on the existing frontend Heroku app and redeploy the frontend from GitHub so Next.js rebuilds its browser bundle. The value must use the actual API app name, with no angle brackets. If the Self-host page has a saved URL, update it there too; that browser setting takes precedence. Keep `ADMIN_TOKEN` and other secrets in the API app's Heroku config vars, rather than committing `api/.env`.
 
 The current single-image removal endpoint processes synchronously. On CPU, model inference can exceed hosting request limits. Heroku, for example, requires an initial response within [30 seconds](https://devcenter.heroku.com/articles/request-timeout). The API Gunicorn configuration reads Heroku's [`$PORT`](https://devcenter.heroku.com/articles/container-registry-and-runtime) when present. A Heroku deployment still needs a separately deployed API and, for slow inference, an asynchronous single-image job flow or sufficiently fast hardware and model settings. Background edits that reuse a cutout avoid another inference pass, but the initial removal still runs the model.
 
