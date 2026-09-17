@@ -1,28 +1,130 @@
 # BgGone
 
-Next.js image studio with a Flask background removal API. The studio supports single images, edge masks, background edits, WebP and PNG export, batch ZIP jobs, and API key management.
+BgGone is a self-hostable background removal studio. A Next.js frontend provides image upload, preview, editing, and export; a Flask API performs segmentation and image processing. The frontend sends images directly to the API.
 
-## Start locally
+## Features
 
-The frontend and API run as separate processes. From the repository root:
+- Remove backgrounds from JPG, PNG, and WebP images and export transparent PNG or WebP files.
+- Inspect and adjust the subject mask, including threshold, feathering, and smoothing.
+- Replace the background with a color or image, or blur the original background. Studio edits reuse the existing cutout, so they do not run segmentation again.
+- Configure CPU or NVIDIA GPU inference and choose a model to balance speed and edge detail.
+- Manage API keys and usage limits through the API key page or API endpoints.
+- Submit batch jobs through the API. The frontend batch upload page currently displays "Coming soon."
+
+## Project structure
+
+| Path | Purpose |
+| --- | --- |
+| `app/`, `components/`, `lib/` | Next.js frontend and studio |
+| `api/removebg_api/` | Flask API, model adapters, and batch worker |
+| `api/openapi.yaml` | API contract |
+| `tests/`, `api/tests/` | Frontend and API tests |
+| `docker-compose.yml` | Local API, worker, and Redis stack |
+
+## Requirements
+
+- Node.js 20.9 or newer and pnpm 10.28.2
+- Python 3.11 through 3.13 for a local API installation
+- Docker and Docker Compose if running the backend stack in containers
+- Redis and an RQ worker only when using batch API jobs
+
+The first API startup downloads the selected model's weights. Disk use, memory use, and processing time depend on the model and hardware.
+
+## Run locally on Windows
+
+Run these commands from the repository root in PowerShell. Create each environment file only if it does not already exist.
 
 ```powershell
 pnpm install
+if (-not (Test-Path api/.env)) { Copy-Item api/.env.example api/.env }
+if (-not (Test-Path .env.local)) { Copy-Item .env.example .env.local }
+python -m venv .venv
+.\.venv\Scripts\python -m pip install -e "./api[cpu,test]"
+```
+
+Start the API in one terminal:
+
+```powershell
+.\.venv\Scripts\python -m flask --app removebg_api.wsgi:app run --port 5000
+```
+
+Start the frontend in another terminal:
+
+```powershell
 pnpm dev
 ```
 
-Open `http://localhost:3000`. The frontend expects the API at `http://localhost:5000/v1`. To change it, copy `.env.example` to `.env.local` and set `NEXT_PUBLIC_API_BASE_URL`, or enter another URL on the self-hosting page. Start the API using [api/README.md](api/README.md). Batch jobs also require Redis and an RQ worker; Docker Compose starts the whole backend stack.
+Open `http://localhost:3000`. Check the API at `http://localhost:5000/v1/health`. The single-image studio does not require Redis. For Unix-like systems or a more detailed backend setup, see [api/README.md](api/README.md).
 
-The browser sends images directly to the API. Set `ALLOWED_ORIGINS` on the API to the frontend origin when hosting them separately. `NEXT_PUBLIC_` values are visible in the browser; never put `ADMIN_TOKEN` in them. Enter the admin token in the API key desk only when managing keys.
+### Run the backend with Docker
 
-## Check the frontend
+Set a long random `ADMIN_TOKEN` in `api/.env`, then run from the repository root:
+
+```powershell
+docker compose up --build
+```
+
+This starts the API on port 5000, an RQ worker, and Redis. It does not start the Next.js frontend; run `pnpm dev` separately. An NVIDIA GPU configuration is available in `docker-compose.gpu.yml` and requires compatible host drivers and the NVIDIA Container Toolkit.
+
+## Configuration
+
+| Setting | Location | Purpose |
+| --- | --- | --- |
+| `NEXT_PUBLIC_API_BASE_URL` | `.env.local` | Browser-accessible API base URL, including `/v1`; defaults to `http://localhost:5000/v1` |
+| `MODEL` | `api/.env` | Segmentation model; defaults to `birefnet-lite` |
+| `DEVICE` | `api/.env` | `cpu` or `gpu` |
+| `EDGE_REFINEMENT` | `api/.env` | `auto`, `alpha`, or `none` |
+| `ALLOWED_ORIGINS` | `api/.env` | Comma-separated frontend origins allowed by API CORS |
+| `ADMIN_TOKEN` | `api/.env` | Secret used to manage API keys |
+
+The API loads `api/.env` automatically; shell environment variables take precedence. Restart the API after changing its settings. `NEXT_PUBLIC_` values are exposed to the browser, so keep `ADMIN_TOKEN` and other secrets in the API environment. See [.env.example](.env.example) and [api/.env.example](api/.env.example) for the full setting lists.
+
+`birefnet-lite` is the smaller default model. `birefnet-portrait` generally gives more detail on portraits but needs more resources. `u2net`, `isnet`, and `birefnet` are also supported. Compare outputs on representative images before choosing a production model; fine hair and fur quality depends on the photo. The local model setting applies to initial removal and to API edits that do not include a cutout.
+
+## Data handling
+
+Single-image requests are processed in memory and are not stored by the API. Batch requests use Redis for temporary input and job metadata, and write completed ZIP files to the configured batch directory. The default batch retention is one hour. API keys and usage data are stored in SQLite by default; use shared storage when running multiple API replicas. Anonymous requests are rate limited, and API keys can be managed with `X-Admin-Token`.
+
+## API overview
+
+All processing routes are under `/v1`.
+
+| Endpoint | Purpose |
+| --- | --- |
+| `POST /background/remove` | Produce a transparent cutout |
+| `POST /mask` | Return a grayscale subject mask |
+| `POST /background/replace` | Use a transparent, color, or image background |
+| `POST /background/blur` | Blur the original background |
+| `POST /batch` | Queue a batch job |
+| `GET /batch/{id}` | Read batch status |
+| `GET /batch/{id}/download` | Download completed batch results |
+| `GET /health`, `GET /ready` | Check the service and model readiness |
+
+For example, from PowerShell:
+
+```powershell
+curl.exe -F "image=@portrait.jpg" http://localhost:5000/v1/background/remove -o portrait-cutout.png
+```
+
+The replace and blur endpoints accept an optional transparent `cutout` with the same dimensions as `image`. When supplied, they reuse its alpha and skip model inference. The studio supplies this cutout automatically. See the [OpenAPI contract](api/openapi.yaml) and [API guide](api/README.md) for parameters, responses, authentication, and batch usage.
+
+## Checks
 
 ```powershell
 pnpm lint
 pnpm test:unit
 pnpm build
-pnpm exec playwright install chromium
 pnpm test:e2e
+.\.venv\Scripts\python -m pytest -q api/tests
+.\.venv\Scripts\python -m ruff check api
 ```
 
-Browser tests use a built frontend on port 3100 and stub image processing responses; the backend does not need to be running. The API contract is in [api/openapi.yaml](api/openapi.yaml). Implementation progress is tracked in [orchestrator/TODO_FRONTEND.md](orchestrator/TODO_FRONTEND.md) and [orchestrator/TODO_API.md](orchestrator/TODO_API.md).
+The browser tests start the built frontend on port 3100 and stub API image responses. Google Chrome is required for local Playwright runs; CI uses Playwright Chromium. The API tests use a fake segmentation adapter and do not download model weights.
+
+## Deployment considerations
+
+Deploy the frontend and API as separate services and set `NEXT_PUBLIC_API_BASE_URL` and `ALLOWED_ORIGINS` to their public URLs. Use a persistent model cache if the platform discards local files on restart. The Docker Compose setup is intended for local use; adapt storage, secrets, and worker capacity to the deployment target.
+
+The current single-image removal endpoint processes synchronously. On CPU, model inference can exceed hosting request limits. Heroku, for example, requires an initial response within [30 seconds](https://devcenter.heroku.com/articles/request-timeout), while its web process must bind to [`$PORT`](https://devcenter.heroku.com/articles/container-registry-and-runtime); the included API Gunicorn configuration currently binds to port 5000. A Heroku deployment therefore needs deployment-specific configuration and, for slow inference, an asynchronous single-image job flow or sufficiently fast hardware and model settings. Background edits that reuse a cutout avoid another inference pass, but the initial removal still runs the model.
+
+Implementation progress is tracked in [the frontend plan](orchestrator/TODO_FRONTEND.md) and [the API plan](orchestrator/TODO_API.md).
