@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowRight, ArrowUpRight, Box, Images, LockKeyhole, ScanFace, WandSparkles } from "lucide-react";
+import { ArrowUpRight, Box, Images, LockKeyhole, WandSparkles } from "lucide-react";
 import Link from "next/link";
 import Workspace from "@/components/workspace";
 import { GITHUB_REPO_URL } from "@/lib/config";
@@ -6,42 +6,6 @@ import { GITHUB_REPO_URL } from "@/lib/config";
 export default function Home() {
   return (
     <main>
-      <section className="hero page-shell">
-        <div className="hero-topline">
-          <span>
-            <span className="signal-dot" /> THE IMAGE STUDIO FOR CLEANER CUTS
-          </span>
-          <span>NO SIGN-UP REQUIRED / 01</span>
-        </div>
-        <div className="hero-copy">
-          <h1>
-            BgGone.
-            <br />
-            <em>Subject first.</em>
-          </h1>
-          <p>
-            Separate the subject from the scene. Make precise edits, swap the backdrop, and take the final image
-            wherever it needs to go.
-          </p>
-          <div className="hero-actions">
-            <a className="button button-dark" href="#workspace">
-              Remove a background <ArrowUpRight size={18} />
-            </a>
-            <Link className="text-link" href="/batch">
-              Working with a set? <ArrowRight size={16} />
-            </Link>
-          </div>
-        </div>
-        <div className="hero-bottomline">
-          <span>
-            <ScanFace size={19} /> Built for people, products, and everything in between.
-          </span>
-          <a href="#workspace" aria-label="Scroll to image workspace">
-            <ArrowDown size={20} />
-          </a>
-          <span>PNG / WEBP / FULL RESOLUTION</span>
-        </div>
-      </section>
       <Workspace />
       <section className="how-section page-shell">
         <div className="section-heading">

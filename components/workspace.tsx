@@ -149,15 +149,9 @@ export default function Workspace() {
 
   return (
     <section id="workspace" className="workspace-section" aria-labelledby="workspace-title">
-      <div className="workspace-heading">
-        <div>
-          <span className="work-index">01 / THE STUDIO</span>
-          <h2 id="workspace-title">
-            Your image, <em>minus the noise.</em>
-          </h2>
-        </div>
-        <p>Upload a photo. Keep what matters. Fine-tune the edges and finish the frame in one place.</p>
-      </div>
+      <h1 id="workspace-title" className="sr-only">
+        BgGone background removal studio
+      </h1>
       <div className="workspace-frame">
         <div className="workspace-topbar">
           <div className="workspace-topbar-left">
