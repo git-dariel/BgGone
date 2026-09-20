@@ -25,9 +25,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${geist.variable} ${geistMono.variable}`}>
       <body className="min-h-screen bg-paper font-sans text-ink">
         <ToastProvider>
-          <SiteHeader />
-          {children}
-          <SiteFooter />
+          <div className="flex min-h-screen flex-col">
+            <SiteHeader />
+            <div className="flex-1">{children}</div>
+            <SiteFooter />
+          </div>
         </ToastProvider>
       </body>
     </html>

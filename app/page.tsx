@@ -1,4 +1,11 @@
-import { Accessibility, ArrowUpRight, Box, GitPullRequest, Images, WandSparkles } from "lucide-react";
+import {
+  Accessibility,
+  ArrowUpRight,
+  Box,
+  GitPullRequest,
+  Images,
+  WandSparkles,
+} from "lucide-react";
 import Link from "next/link";
 import Workspace from "@/components/workspace";
 import { GITHUB_REPO_URL } from "@/lib/config";
@@ -76,7 +83,8 @@ export default function Home() {
             more accessible.
           </h2>
           <p>
-            Help improve keyboard access, screen-reader support, contrast, and the experience on every device.
+            Help improve keyboard access, screen-reader support, contrast, and the experience on
+            every device.
           </p>
           <Link href="/contribute">
             See how to contribute <ArrowUpRight size={17} />
@@ -91,22 +99,15 @@ export default function Home() {
             More possibilities.
           </h2>
           <p>
-            Contribute fixes, edge-quality improvements, thoughtful features, or clearer documentation on GitHub.
+            Contribute fixes, edge-quality improvements, thoughtful features, or clearer
+            documentation on GitHub.
           </p>
           <Link href="/contribute">
             Join the project <ArrowUpRight size={17} />
           </Link>
         </div>
       </section>
-      {GITHUB_REPO_URL && (
-        <section className="open-source-strip page-shell">
-          <span>OPEN SOURCE / SELF-HOSTABLE</span>
-          <p>Run the stack on your terms, contribute a fix, or take a closer look at the code.</p>
-          <a href={GITHUB_REPO_URL} target="_blank" rel="noopener noreferrer">
-            View the repository <ArrowUpRight size={16} />
-          </a>
-        </section>
-      )}
+
       <section className="border-t border-line bg-surface" aria-labelledby="contact-title">
         <div className="page-shell grid gap-8 py-14 md:grid-cols-[0.55fr_1fr] md:items-end md:py-18">
           <span className="mini-label">CONTACT / SAY HELLO</span>
