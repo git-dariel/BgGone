@@ -12,12 +12,24 @@ from .errors import APIError
 MODEL_NAMES = {
     "u2net": "u2net",
     "u2netp": "u2netp",
+    "silueta": "silueta",
     "isnet": "isnet-general-use",
     "birefnet": "birefnet-general",
     "birefnet-lite": "birefnet-general-lite",
     "birefnet-portrait": "birefnet-portrait",
 }
 log = logging.getLogger(__name__)
+
+
+def memory_bounded_session_options():
+    import onnxruntime as ort
+
+    options = ort.SessionOptions()
+    options.intra_op_num_threads = 1
+    options.inter_op_num_threads = 1
+    options.enable_mem_pattern = False
+    options.enable_cpu_mem_arena = False
+    return options
 
 
 class ModelAdapter(ABC):
@@ -50,7 +62,11 @@ class ModelAdapter(ABC):
                             if "CUDAExecutionProvider" not in ort.get_available_providers():
                                 raise RuntimeError("CUDAExecutionProvider is unavailable")
                             providers.insert(0, "CUDAExecutionProvider")
-                        self._session = new_session(self.model_name, providers=providers)
+                        self._session = new_session(
+                            self.model_name,
+                            sess_opts=memory_bounded_session_options(),
+                            providers=providers,
+                        )
                     except Exception as exc:
                         log.exception("Model loading failed")
                         raise APIError("model_unavailable", "Model could not be loaded", 503) from exc
@@ -79,6 +95,10 @@ class U2NetAdapter(ModelAdapter):
 
 class U2NetPAdapter(ModelAdapter):
     model_name = MODEL_NAMES["u2netp"]
+    model_url = "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx"
+    model_hash = "sha256:309c8469258dda742793dce0ebea8e6dd393174f89934733ecc8b14c76f4ddd8"
+    model_file = "u2netp.onnx"
+    error_label = "U2NetP"
 
     def load(self):
         if self._session is None:
@@ -89,11 +109,11 @@ class U2NetPAdapter(ModelAdapter):
                         import pooch
 
                         home = os.getenv("U2NET_HOME") or os.getenv("REMBG_HOME") or str(Path.home() / ".rembg")
-                        model_dir = Path(home) / "models" / "u2netp"
+                        model_dir = Path(home) / "models" / self.model_name
                         model_path = pooch.retrieve(
-                            "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2netp.onnx",
-                            known_hash="sha256:309c8469258dda742793dce0ebea8e6dd393174f89934733ecc8b14c76f4ddd8",
-                            fname="u2netp.onnx",
+                            self.model_url,
+                            known_hash=self.model_hash,
+                            fname=self.model_file,
                             path=model_dir,
                             progressbar=False,
                         )
@@ -102,16 +122,12 @@ class U2NetPAdapter(ModelAdapter):
                             if "CUDAExecutionProvider" not in ort.get_available_providers():
                                 raise RuntimeError("CUDAExecutionProvider is unavailable")
                             providers.insert(0, "CUDAExecutionProvider")
-                        options = ort.SessionOptions()
-                        options.intra_op_num_threads = 1
-                        options.inter_op_num_threads = 1
-                        options.enable_mem_pattern = False
-                        options.enable_cpu_mem_arena = False
+                        options = memory_bounded_session_options()
                         self._session = ort.InferenceSession(
                             model_path, sess_options=options, providers=providers
                         )
                     except Exception as exc:
-                        log.exception("U2NetP model loading failed")
+                        log.exception("%s model loading failed", self.error_label)
                         raise APIError("model_unavailable", "Model could not be loaded", 503) from exc
         return self._session
 
@@ -138,9 +154,16 @@ class U2NetPAdapter(ModelAdapter):
         except APIError:
             raise
         except Exception as exc:
-            log.exception("U2NetP inference failed")
+            log.exception("%s inference failed", self.error_label)
             raise APIError("inference_failed", "Image inference failed", 503) from exc
 
+
+class SiluetaAdapter(U2NetPAdapter):
+    model_name = MODEL_NAMES["silueta"]
+    model_url = "https://github.com/danielgatis/rembg/releases/download/v0.0.0/silueta.onnx"
+    model_hash = "md5:55e59e0d8062d2f5d013f4725ee84782"
+    model_file = "silueta.onnx"
+    error_label = "Silueta"
 
 class ISNetAdapter(ModelAdapter):
     model_name = MODEL_NAMES["isnet"]
@@ -161,6 +184,7 @@ class BiRefNetPortraitAdapter(ModelAdapter):
 ADAPTERS = {
     "u2net": U2NetAdapter,
     "u2netp": U2NetPAdapter,
+    "silueta": SiluetaAdapter,
     "isnet": ISNetAdapter,
     "birefnet": BiRefNetAdapter,
     "birefnet-lite": BiRefNetLiteAdapter,
@@ -181,8 +205,8 @@ class BackgroundRemovalService:
         try:
             source = image.copy()
             side = self.max_side
-            if side and self.adapter.model_name == "u2netp":
-                side = min(side, 512)
+            if self.adapter.model_name in {"u2netp", "silueta"}:
+                side = min(side, 512) if side else 512
             elif side and self.adapter.uses_alpha_matting:
                 # Full-resolution closed-form matting is very expensive on CPU.
                 side = min(side, 1024)

@@ -12,7 +12,19 @@ from removebg_api.models import BackgroundRemovalService
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("image")
-    parser.add_argument("--model", choices=["u2net", "u2netp", "isnet", "birefnet", "birefnet-lite", "birefnet-portrait"], default="u2netp")
+    parser.add_argument(
+        "--model",
+        choices=[
+            "u2net",
+            "u2netp",
+            "silueta",
+            "isnet",
+            "birefnet",
+            "birefnet-lite",
+            "birefnet-portrait",
+        ],
+        default="silueta",
+    )
     parser.add_argument("--device", choices=["cpu", "gpu"], default="cpu")
     parser.add_argument("--runs", type=int, default=5)
     args = parser.parse_args()

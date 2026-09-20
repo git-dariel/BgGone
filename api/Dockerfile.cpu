@@ -1,11 +1,15 @@
 FROM python:3.12-slim
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 U2NET_HOME=/models
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 U2NET_HOME=/models NUMBA_CACHE_DIR=/tmp/numba
 WORKDIR /srv
 RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
 COPY pyproject.toml ./
 COPY gunicorn.conf.py ./
 COPY removebg_api ./removebg_api
-RUN pip install --no-cache-dir '.[cpu]' && useradd -r -u 10001 app && mkdir -p /models /data && chown -R app:app /models /data
+RUN pip install --no-cache-dir '.[cpu]' \
+    && mkdir -p /models /data /tmp/numba \
+    && python -c "import pooch; pooch.retrieve('https://github.com/danielgatis/rembg/releases/download/v0.0.0/silueta.onnx', known_hash='md5:55e59e0d8062d2f5d013f4725ee84782', fname='silueta.onnx', path='/models/models/silueta', progressbar=False)" \
+    && useradd -r -m -d /home/app -u 10001 app \
+    && chown -R app:app /models /data /tmp/numba
 USER app
 EXPOSE 5000
 CMD ["gunicorn", "-c", "gunicorn.conf.py", "removebg_api.wsgi:app"]

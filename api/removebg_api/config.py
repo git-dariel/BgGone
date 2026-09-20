@@ -11,7 +11,7 @@ def _boolean(name: str, default: bool) -> bool:
 
 @dataclass(frozen=True)
 class Settings:
-    model: str = "u2netp"
+    model: str = "silueta"
     device: str = "cpu"
     edge_refinement: str = "auto"
     warm_model: bool = True
@@ -46,14 +46,26 @@ class Settings:
             else:
                 values[name] = raw
         settings = cls(**values)
-        if settings.model not in {"u2net", "u2netp", "isnet", "birefnet", "birefnet-lite", "birefnet-portrait"}:
-            raise ValueError("MODEL must be u2net, u2netp, isnet, birefnet, birefnet-lite, or birefnet-portrait")
+        supported_models = {
+            "u2net",
+            "u2netp",
+            "silueta",
+            "isnet",
+            "birefnet",
+            "birefnet-lite",
+            "birefnet-portrait",
+        }
+        if settings.model not in supported_models:
+            raise ValueError(
+                "MODEL must be u2net, u2netp, silueta, isnet, birefnet, "
+                "birefnet-lite, or birefnet-portrait"
+            )
         if settings.device not in {"cpu", "gpu"}:
             raise ValueError("DEVICE must be cpu or gpu")
         if settings.edge_refinement not in {"auto", "alpha", "none"}:
             raise ValueError("EDGE_REFINEMENT must be auto, alpha, or none")
-        if settings.model == "u2netp" and settings.edge_refinement == "alpha":
-            raise ValueError("EDGE_REFINEMENT=alpha is not supported with u2netp")
+        if settings.model in {"u2netp", "silueta"} and settings.edge_refinement == "alpha":
+            raise ValueError(f"EDGE_REFINEMENT=alpha is not supported with {settings.model}")
         if settings.max_upload_mb < 1 or settings.max_batch_size < 1:
             raise ValueError("Upload and batch limits must be positive")
         return settings

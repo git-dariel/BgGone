@@ -1,22 +1,29 @@
 # BgGone API
 
-Flask API for the Next.js frontend. Processing routes live under `/v1`. Model weights are downloaded to the rembg model cache on first startup. Single-image requests stay in memory. Batch input and job metadata remain in Redis for up to `BATCH_RETENTION_SECONDS` after processing; completed ZIP files expire after the same retention interval.
+Flask API for the Next.js frontend. Processing routes live under `/v1`. The default CPU image includes the Silueta model weights; other model weights are downloaded to the rembg model cache on first startup. Single-image requests stay in memory. Batch input and job metadata remain in Redis for up to `BATCH_RETENTION_SECONDS` after processing; completed ZIP files expire after the same retention interval.
 
-## Local CPU setup
+## Run locally with PowerShell (CPU)
 
-Use Python 3.11–3.13 and start Redis for batches. From this directory:
+Install Python 3.11, 3.12, or 3.13. Then open PowerShell at the repository root and run:
 
-```bash
-python -m venv .venv
-# Activate .venv for your shell.
-pip install -e '.[cpu,test]'
-cp .env.example .env
-# The API and worker load api/.env automatically; shell environment variables take precedence.
-flask --app removebg_api.wsgi:app run --port 5000
-python -m removebg_api.worker
+```powershell
+Set-Location .\api
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install --upgrade pip
+.\.venv\Scripts\python.exe -m pip install -e ".[cpu,test]"
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+.\.venv\Scripts\python.exe -m flask --app removebg_api.wsgi:app run --port 5000
 ```
 
-The second Python command runs in another terminal. On Windows, use Docker for RQ workers; RQ's default worker process model requires Unix process forking. The HTTP service can run directly on Windows.
+If `.env` already exists from an older setup, set `MODEL=silueta`, `EDGE_REFINEMENT=auto`, and `MAX_INFERENCE_SIDE=512` in that file before starting the API.
+
+The API will be available at `http://localhost:5000`. Check it from a second PowerShell window:
+
+```powershell
+Invoke-RestMethod -Uri http://localhost:5000/v1/health
+```
+
+The API and worker load `api/.env` automatically; PowerShell environment variables take precedence. Redis is only required for batch processing. On Windows, use Docker for Redis and the RQ worker because RQ's default worker process model requires Unix process forking; the HTTP API itself runs directly in PowerShell.
 
 ## Docker CPU or NVIDIA GPU
 
@@ -28,7 +35,49 @@ docker compose up --build
 docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build
 ```
 
-The API listens on port 5000. The CPU and GPU images use the appropriate `rembg` extra. See [rembg's installation guide](https://github.com/danielgatis/rembg#installation) for CUDA and ONNX Runtime compatibility. `MODEL` accepts `u2netp`, `u2net`, `isnet`, `birefnet`, `birefnet-lite`, or `birefnet-portrait`. The default `u2netp` model is the smallest option for memory-limited CPU hosts. Its direct ONNX path retains a soft mask with a 512-pixel input cap and avoids the memory cost of closed-form alpha matting. `EDGE_REFINEMENT=alpha` is unavailable with `u2netp`. It can still miss fine strands and must be checked against real portraits. BiRefNet models usually retain more detail but need substantially more memory. Restart the API and worker after changing these settings; a new model downloads weights on first use. `DEVICE=gpu` fails readiness if CUDA is not available. Set `ALLOWED_ORIGINS` to a comma-separated list of trusted frontend origins. The frontend uses `NEXT_PUBLIC_API_BASE_URL=http://localhost:5000/v1` by default.
+The API listens on port 5000. The CPU and GPU images use the appropriate `rembg` extra. See [rembg's installation guide](https://github.com/danielgatis/rembg#installation) for CUDA and ONNX Runtime compatibility. `MODEL` accepts `silueta`, `u2netp`, `u2net`, `isnet`, `birefnet`, `birefnet-lite`, or `birefnet-portrait`.
+
+`silueta` is the default for CPU deployments. It is larger and slower than U2NetP, but remains lightweight and produces a more detailed soft mask through a direct, memory-bounded ONNX path with a 512-pixel working-image cap. This improves many hair and fur boundaries without loading the much heavier alpha-matting runtime. Fine-edge quality still depends on contrast, focus, and the source image. U2NetP remains available as the lowest-memory rollback option. `EDGE_REFINEMENT=alpha` is unavailable with both lightweight direct adapters. BiRefNet models can produce stronger masks but need substantially more memory and are not recommended for a 512 MB Heroku Basic dyno.
+
+Restart the API and worker after changing model settings. Models other than the CPU image's bundled default download their weights on first use. `DEVICE=gpu` fails readiness if CUDA is not available. Set `ALLOWED_ORIGINS` to a comma-separated list of trusted frontend origins. The frontend uses `NEXT_PUBLIC_API_BASE_URL=http://localhost:5000/v1` by default.
+
+## Heroku CLI and logs
+
+Run these commands in PowerShell to sign in, confirm access to the `bggone-api` app, and stream its logs:
+
+```powershell
+heroku --version
+heroku login
+heroku auth:whoami
+heroku apps:info --app bggone-api
+heroku logs --tail --app bggone-api
+```
+
+Heroku apps are selected with `--app bggone-api`; you do not navigate into the app as a directory. Press `Ctrl+C` to stop streaming logs. To display the most recent 200 log entries without continuing to stream:
+
+```powershell
+heroku logs --num 200 --app bggone-api
+```
+
+Configure the Heroku Basic dyno for the memory-bounded Silueta pipeline:
+
+```powershell
+heroku config:set MODEL=silueta EDGE_REFINEMENT=auto MAX_INFERENCE_SIDE=512 MAX_CONCURRENT_INFERENCE=1 WEB_WORKERS=1 OMP_NUM_THREADS=1 --app bggone-api
+heroku logs --tail --app bggone-api
+```
+
+After deploying, check readiness and confirm that it reports `"model":"silueta"`:
+
+```powershell
+$appUrl = (heroku apps:info --app bggone-api --json | ConvertFrom-Json).web_url
+Invoke-RestMethod -Uri "$($appUrl.TrimEnd('/'))/v1/ready"
+```
+
+If the dyno reports memory or timeout errors, roll back to U2NetP:
+
+```powershell
+heroku config:set MODEL=u2netp EDGE_REFINEMENT=auto --app bggone-api
+```
 
 ## API calls
 
@@ -82,7 +131,7 @@ The secret is shown once. Send it in `X-API-Key`. Anonymous requests are rate li
 
 ## Limits and responses
 
-Defaults are 12 MiB per image, 25 million pixels per image, 10 images per batch, 1 concurrent model call per API process, 100 queued batches, 120 seconds per image, and 1 hour batch retention. `MAX_INFERENCE_SIDE` scales model input down and restores the mask to original dimensions. U2NetP input is capped at 512 pixels and U2Net alpha matting at 1024 pixels unless `MAX_INFERENCE_SIDE=0`, which disables downscaling. Gunicorn and RQ enforce request/job timeouts. Large or malformed uploads return JSON errors. Processing errors use the same shape:
+Defaults are 12 MiB per image, 25 million pixels per image, 10 images per batch, 1 concurrent model call per API process, 100 queued batches, 120 seconds per image, and 1 hour batch retention. `MAX_INFERENCE_SIDE` scales the working image down and restores the mask to original dimensions. Silueta and U2NetP are capped at 512 pixels; U2Net alpha matting is capped at 1024 pixels. Setting `MAX_INFERENCE_SIDE=0` disables general downscaling, but the model-specific safety caps still apply. Gunicorn and RQ enforce request/job timeouts. Large or malformed uploads return JSON errors. Processing errors use the same shape:
 
 ```json
 {"error":{"code":"invalid_image","message":"Image cannot be decoded"},"request_id":"..."}
@@ -102,6 +151,13 @@ pip-audit
 
 The automated suite uses a fake segmentation adapter so it can run without downloading weights. A live CPU pipeline smoke test requires installing `.[cpu]`, setting `WARM_MODEL=true`, and sending a real image. GPU inference needs a compatible NVIDIA host; Docker builds alone do not verify CUDA execution.
 
-For local timings with real weights, run `python benchmark.py portrait.jpg --device cpu` or `python benchmark.py portrait.jpg --device gpu` on the target host. The script warms the model first and reports median times; hardware-specific results are not checked into the repository.
+For local timings with real weights, compare Silueta with U2NetP from PowerShell:
+
+```powershell
+.\.venv\Scripts\python.exe benchmark.py portrait.jpg --model silueta --device cpu
+.\.venv\Scripts\python.exe benchmark.py portrait.jpg --model u2netp --device cpu
+```
+
+The script warms the model first and reports median times; hardware-specific results are not checked into the repository. Compare the generated API output on representative human-hair and pet-fur images as well as the timings, because the benchmark does not score edge quality.
 
 The remaining unchecked items in `orchestrator/TODO_API.md` need real photos, CPU/GPU hardware, or deployment targets. Fine hair and fur quality still depends on the image and model; check the transparent result against the original, especially around low-contrast strands. Rembg already uses ONNX Runtime, so a separate acceleration toggle has not been added. Staging and production deployment workflows need the hosting target and credentials.

@@ -11,13 +11,31 @@ from removebg_api.models import (
     BiRefNetLiteAdapter,
     BiRefNetPortraitAdapter,
     ISNetAdapter,
+    SiluetaAdapter,
     U2NetAdapter,
     U2NetPAdapter,
 )
 
 
 def test_adapter_names():
-    assert [cls("cpu").model_name for cls in (U2NetAdapter, U2NetPAdapter, ISNetAdapter, BiRefNetAdapter, BiRefNetLiteAdapter, BiRefNetPortraitAdapter)] == ["u2net", "u2netp", "isnet-general-use", "birefnet-general", "birefnet-general-lite", "birefnet-portrait"]
+    adapters = (
+        U2NetAdapter,
+        U2NetPAdapter,
+        SiluetaAdapter,
+        ISNetAdapter,
+        BiRefNetAdapter,
+        BiRefNetLiteAdapter,
+        BiRefNetPortraitAdapter,
+    )
+    assert [cls("cpu").model_name for cls in adapters] == [
+        "u2net",
+        "u2netp",
+        "silueta",
+        "isnet-general-use",
+        "birefnet-general",
+        "birefnet-general-lite",
+        "birefnet-portrait",
+    ]
 
 
 def test_u2net_uses_matted_alpha_instead_of_raw_mask(monkeypatch):
@@ -36,6 +54,60 @@ def test_u2net_uses_matted_alpha_instead_of_raw_mask(monkeypatch):
     assert mask.getpixel((0, 0)) == 96
     assert calls[0]["alpha_matting"] is True
     assert calls[0].get("only_mask") is not True
+
+
+def test_silueta_keeps_soft_mask_without_loading_rembg(monkeypatch):
+    import numpy as np
+
+    class FakeSession:
+        def get_inputs(self):
+            return [SimpleNamespace(name="input.1")]
+
+        def run(self, _outputs, values):
+            assert values["input.1"].shape == (1, 3, 320, 320)
+            prediction = np.zeros((1, 1, 320, 320), dtype=np.float32)
+            prediction[0, 0, :, 160:] = 0.4
+            prediction[0, 0, 0, 0] = 1
+            return [prediction]
+
+    adapter = SiluetaAdapter("cpu")
+    monkeypatch.setattr(adapter, "load", lambda: FakeSession())
+    mask = adapter.predict(Image.new("RGB", (320, 320)))
+    assert mask.mode == "L"
+    assert 0 < mask.getpixel((240, 160)) < 255
+
+
+def test_silueta_session_uses_memory_bounded_options(monkeypatch):
+    calls = []
+
+    class FakeOptions:
+        intra_op_num_threads = 0
+        inter_op_num_threads = 0
+        enable_mem_pattern = True
+        enable_cpu_mem_arena = True
+
+    fake_runtime = SimpleNamespace(
+        SessionOptions=FakeOptions,
+        InferenceSession=lambda model_path, **options: calls.append((model_path, options))
+        or object(),
+        get_available_providers=lambda: ["CPUExecutionProvider"],
+    )
+    monkeypatch.setitem(sys.modules, "onnxruntime", fake_runtime)
+    monkeypatch.setitem(
+        sys.modules,
+        "pooch",
+        SimpleNamespace(retrieve=lambda *args, **kwargs: "silueta.onnx"),
+    )
+    SiluetaAdapter("cpu").load()
+
+    model_path, options = calls[0]
+    session_options = options["sess_options"]
+    assert model_path == "silueta.onnx"
+    assert options["providers"] == ["CPUExecutionProvider"]
+    assert session_options.intra_op_num_threads == 1
+    assert session_options.inter_op_num_threads == 1
+    assert session_options.enable_mem_pattern is False
+    assert session_options.enable_cpu_mem_arena is False
 
 
 def test_u2netp_keeps_soft_mask_without_loading_rembg(monkeypatch):
@@ -117,6 +189,33 @@ def test_u2netp_input_is_bounded_for_basic_dyno():
     mask, _ = service.mask(Image.new("RGB", (1500, 750)))
     assert sizes == [(512, 256)]
     assert mask.size == (1500, 750)
+
+
+def test_silueta_input_is_bounded_for_basic_dyno():
+    service = BackgroundRemovalService("silueta", "cpu", 2048, 1)
+    sizes = []
+
+    def predict(image):
+        sizes.append(image.size)
+        return Image.new("L", image.size, 128)
+
+    service.adapter.predict = predict
+    mask, _ = service.mask(Image.new("RGB", (1500, 750)))
+    assert sizes == [(512, 256)]
+    assert mask.size == (1500, 750)
+
+
+def test_silueta_safety_cap_applies_when_general_downscaling_is_disabled():
+    service = BackgroundRemovalService("silueta", "cpu", 0, 1)
+    sizes = []
+
+    def predict(image):
+        sizes.append(image.size)
+        return Image.new("L", image.size, 128)
+
+    service.adapter.predict = predict
+    service.mask(Image.new("RGB", (1100, 550)))
+    assert sizes == [(512, 256)]
 
 
 def test_zero_max_side_keeps_full_resolution():
