@@ -2,7 +2,7 @@ export const DEFAULT_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://
 export const MAX_UPLOAD_MB = Number(process.env.NEXT_PUBLIC_MAX_UPLOAD_MB || 12);
 export const MAX_IMAGE_PIXELS = Number(process.env.NEXT_PUBLIC_MAX_IMAGE_PIXELS || 25_000_000);
 export const MAX_BATCH_SIZE = Number(process.env.NEXT_PUBLIC_MAX_BATCH_SIZE || 10);
-export const GITHUB_REPO_URL = process.env.NEXT_PUBLIC_GITHUB_REPO_URL || "";
+export const GITHUB_REPO_URL = process.env.NEXT_PUBLIC_GITHUB_REPO_URL || "https://github.com/git-dariel/BgGone";
 
 export function getApiBase(): string {
   if (typeof window === "undefined") return DEFAULT_API_BASE.replace(/\/$/, "");

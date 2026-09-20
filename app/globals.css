@@ -92,13 +92,13 @@ body { font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif; }
   .brand { @apply inline-flex items-center gap-2 whitespace-nowrap text-[23px] font-semibold tracking-[-0.075em]; }
   .brand-bold { @apply font-extrabold; }
   .brand-period { @apply font-black text-lime-600; }
-  .brand-mark, .footer-mark { @apply grid h-[34px] w-[34px] place-items-center rounded-[9px] bg-charcoal text-accent; }
+  .brand-mark { @apply grid h-[34px] w-[34px] place-items-center rounded-[9px] bg-charcoal text-accent; }
   .desktop-nav { @apply flex items-center gap-1 rounded-full border border-line bg-surface-alt p-1; }
   .nav-link { @apply rounded-full px-4 py-2 text-[13px] font-semibold text-muted transition-colors; }
   .nav-link:hover, .nav-link.active { @apply bg-surface text-ink; }
   .header-actions { @apply flex items-center gap-3; }
-  .header-cta { @apply flex items-center gap-2 rounded-[9px] bg-charcoal px-4 py-3 text-[13px] font-bold text-white; }
-  .header-cta:hover { @apply bg-slate-700; }
+  .header-github { @apply grid h-11 w-11 place-items-center rounded-[9px] bg-charcoal text-white; }
+  .header-github:hover { @apply bg-slate-700; }
   .icon-button { @apply grid h-9 w-9 place-items-center rounded-lg border-0 bg-transparent text-ink; }
   .icon-button:hover { @apply bg-surface-alt; }
   .menu-toggle, .mobile-nav { @apply hidden; }
@@ -280,15 +280,9 @@ body { font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif; }
   .open-source-strip p { @apply m-0 text-[13px] text-muted; }
   .open-source-strip > a { @apply flex items-center gap-2 whitespace-nowrap text-xs font-bold; }
   .site-footer { @apply border-t border-line bg-surface-alt; }
-  .footer-inner { @apply mx-auto grid w-[min(calc(100%-4rem),1360px)] grid-cols-[1fr_auto] gap-5 py-8; }
-  .footer-brand { @apply flex items-center gap-2.5; }
-  .footer-brand strong { @apply text-xl tracking-tight; }
-  .footer-brand > span:last-child { @apply ml-3 text-xs text-muted; }
-  .footer-mark { @apply h-[29px] w-[29px] rounded-md; }
-  .site-footer nav { @apply flex items-center gap-6 text-xs font-semibold; }
-  .site-footer nav a:hover { @apply underline; }
-  .site-footer nav a:last-child { @apply flex items-center gap-1; }
-  .site-footer small { @apply col-span-full text-[11px] text-muted; }
+  .footer-inner { @apply mx-auto flex min-h-24 w-[min(calc(100%-4rem),1360px)] items-center py-8; }
+  .footer-legal { @apply flex flex-wrap items-center text-xs font-semibold text-muted; }
+  .footer-legal a { @apply text-ink hover:underline; }
   .modal-backdrop { @apply fixed inset-0 z-[100] grid place-items-center bg-black/75 p-5; }
   .modal-panel { @apply w-full max-w-[480px] rounded-2xl border border-line bg-surface p-6 text-ink shadow-2xl; }
   .modal-head { @apply flex items-center justify-between gap-3; }
@@ -318,7 +312,7 @@ body { font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif; }
 
 @media (max-width: 800px) {
   .page-shell, .workspace-section, .header-inner, .footer-inner { @apply w-[min(calc(100%-2.25rem),1360px)]; }
-  .desktop-nav, .header-cta { @apply hidden; }
+  .desktop-nav { @apply hidden; }
   .menu-toggle { @apply grid; }
   .mobile-nav { @apply grid gap-1 border-t border-line bg-paper px-5 pt-1 pb-4; }
   .mobile-nav a { @apply rounded-lg px-4 py-2.5 text-sm font-bold; }
@@ -375,10 +369,6 @@ body { font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif; }
   .closing-cell, .closing-cell + .closing-cell { @apply border-0 p-0; }
   .closing-cell > svg, .api-glyph { @apply mb-4; }
   .open-source-strip { @apply flex-col items-start; }
-  .footer-inner { @apply flex flex-col; }
-  .footer-brand { @apply flex-wrap; }
-  .footer-brand > span:last-child { @apply ml-0; }
-  .site-footer nav { @apply flex-wrap gap-4; }
   .modal-actions { @apply flex-wrap; }
 }
 

@@ -107,6 +107,27 @@ export default function Home() {
           </a>
         </section>
       )}
+      <section className="border-t border-line bg-surface" aria-labelledby="contact-title">
+        <div className="page-shell grid gap-8 py-14 md:grid-cols-[0.55fr_1fr] md:items-end md:py-18">
+          <span className="mini-label">CONTACT / SAY HELLO</span>
+          <div>
+            <h2
+              id="contact-title"
+              className="m-0 text-[clamp(34px,4.8vw,64px)] leading-[1.02] font-semibold tracking-[-0.06em]"
+            >
+              Questions, feedback,
+              <br />
+              or a good idea?
+            </h2>
+            <a
+              className="mt-7 inline-flex items-center gap-3 border-b border-ink pb-2 text-sm font-bold sm:text-base"
+              href="mailto:dariel.v.avila@gmail.com"
+            >
+              dariel.v.avila@gmail.com <ArrowUpRight size={18} />
+            </a>
+          </div>
+        </div>
+      </section>
     </main>
   );
 }

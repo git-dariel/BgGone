@@ -62,7 +62,7 @@ test("batch page shows a coming soon message", async ({ page }) => {
 test("responsive pages have no horizontal overflow", async ({ page }, testInfo) => {
   for (const width of [1440, 768, 390]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const path of ["/", "/batch", "/contribute"]) {
+    for (const path of ["/", "/batch", "/contribute", "/privacy", "/terms"]) {
       await page.goto(path);
       await expect(page.locator("main").first()).toBeVisible();
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
@@ -78,15 +78,14 @@ test("responsive pages have no horizontal overflow", async ({ page }, testInfo) 
           )
         : [];
       expect(overflow, `${path} at ${width}px: ${outside.join(", ")}`).toBe(false);
-      if (path === "/") await page.screenshot({ path: testInfo.outputPath(`home-${width}.png`), fullPage: true });
-      if (path === "/contribute")
-        await page.screenshot({ path: testInfo.outputPath(`contribute-${width}.png`), fullPage: true });
+      const pageName = path === "/" ? "home" : path.slice(1);
+      await page.screenshot({ path: testInfo.outputPath(`${pageName}-${width}.png`), fullPage: true });
     }
   }
 });
 
 test("public pages have no serious accessibility violations", async ({ page }) => {
-  for (const path of ["/", "/contribute"]) {
+  for (const path of ["/", "/contribute", "/privacy", "/terms"]) {
     await page.goto(path);
     await expect(page.getByRole("link", { name: "BgGone home" })).toBeVisible();
     await expect(page).toHaveTitle(/BgGone/);
@@ -129,6 +128,52 @@ test("contribute page links to the public repository", async ({ page }) => {
     "href",
     "https://github.com/git-dariel/BgGone",
   );
+});
+
+test("header, contact section, and legal footer link to the requested destinations", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("link", { name: "View BgGone on GitHub" })).toHaveAttribute(
+    "href",
+    "https://github.com/git-dariel/BgGone",
+  );
+  const mainNavigation = page.getByRole("navigation", { name: "Main navigation" });
+  await expect(mainNavigation.getByRole("link", { name: "Privacy Policy" })).toHaveCount(0);
+  await expect(mainNavigation.getByRole("link", { name: "Terms of Use" })).toHaveCount(0);
+  await expect(page.locator("main > section").last().getByRole("heading", { name: "Questions, feedback, or a good idea?" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "dariel.v.avila@gmail.com" })).toHaveAttribute(
+    "href",
+    "mailto:dariel.v.avila@gmail.com",
+  );
+  const footer = page.getByRole("contentinfo");
+  await expect(footer).toContainText("© 2026 BgGone · Privacy Policy · Terms of Use");
+  await expect(footer.getByRole("link", { name: "Privacy Policy" })).toHaveAttribute("href", "/privacy");
+  await expect(footer.getByRole("link", { name: "Terms of Use" })).toHaveAttribute("href", "/terms");
+  await expect(footer.getByText("Contact")).toHaveCount(0);
+});
+
+test("privacy and terms pages include the required disclosures and contact", async ({ page }) => {
+  await page.goto("/privacy");
+  await expect(page.getByRole("heading", { name: "Privacy Policy" })).toBeVisible();
+  await expect(page.getByText("BgGone has no user accounts", { exact: false })).toBeVisible();
+  await expect(page.getByText("processed in memory", { exact: false })).toBeVisible();
+  await expect(page.getByRole("link", { name: "dariel.v.avila@gmail.com" })).toHaveAttribute(
+    "href",
+    "mailto:dariel.v.avila@gmail.com",
+  );
+
+  await page.goto("/terms");
+  await expect(page.getByRole("heading", { name: "Terms of Use" })).toBeVisible();
+  for (const heading of [
+    "Acceptable use",
+    "Intellectual property",
+    "Availability and changes",
+    "Provided as is",
+    "Limitation of liability",
+    "Third-party services",
+    "Changes and contact",
+  ]) {
+    await expect(page.getByRole("heading", { name: heading })).toBeVisible();
+  }
 });
 
 test("removed API and self-host routes return the missing page", async ({ page }) => {
