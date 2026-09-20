@@ -8,8 +8,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 const links = [
   { href: "/", label: "Studio" },
   { href: "/batch", label: "Batch" },
-  { href: "/api", label: "API" },
-  { href: "/self-host", label: "Self-host" },
+  { href: "/contribute", label: "Contribute" },
 ];
 const subscribeTheme = (callback: () => void) => {
   const media = window.matchMedia("(prefers-color-scheme: dark)");

@@ -62,7 +62,7 @@ test("batch page shows a coming soon message", async ({ page }) => {
 test("responsive pages have no horizontal overflow", async ({ page }, testInfo) => {
   for (const width of [1440, 768, 390]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const path of ["/", "/batch", "/api", "/self-host"]) {
+    for (const path of ["/", "/batch", "/contribute"]) {
       await page.goto(path);
       await expect(page.locator("main").first()).toBeVisible();
       const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
@@ -79,16 +79,20 @@ test("responsive pages have no horizontal overflow", async ({ page }, testInfo) 
         : [];
       expect(overflow, `${path} at ${width}px: ${outside.join(", ")}`).toBe(false);
       if (path === "/") await page.screenshot({ path: testInfo.outputPath(`home-${width}.png`), fullPage: true });
+      if (path === "/contribute")
+        await page.screenshot({ path: testInfo.outputPath(`contribute-${width}.png`), fullPage: true });
     }
   }
 });
 
-test("home page has no serious accessibility violations", async ({ page }) => {
-  await page.goto("/");
-  await expect(page.getByRole("link", { name: "BgGone home" })).toBeVisible();
-  await expect(page).toHaveTitle(/BgGone/);
-  const results = await new AxeBuilder({ page }).analyze();
-  expect(results.violations.filter((item) => ["critical", "serious"].includes(item.impact || ""))).toEqual([]);
+test("public pages have no serious accessibility violations", async ({ page }) => {
+  for (const path of ["/", "/contribute"]) {
+    await page.goto(path);
+    await expect(page.getByRole("link", { name: "BgGone home" })).toBeVisible();
+    await expect(page).toHaveTitle(/BgGone/);
+    const results = await new AxeBuilder({ page }).analyze();
+    expect(results.violations.filter((item) => ["critical", "serious"].includes(item.impact || ""))).toEqual([]);
+  }
 });
 
 test("API errors show a retry action and can recover", async ({ page }) => {
@@ -118,43 +122,20 @@ test("API errors show a retry action and can recover", async ({ page }) => {
   expect(attempts).toBe(2);
 });
 
-test("key desk creates, checks, and revokes a key", async ({ page }) => {
-  await page.route("**/v1/keys", (route) =>
-    route.fulfill({
-      status: 201,
-      contentType: "application/json",
-      body: JSON.stringify({ id: "key-1", api_key: "rb-secret" }),
-      headers: { "Access-Control-Allow-Origin": "*" },
-    }),
+test("contribute page links to the public repository", async ({ page }) => {
+  await page.goto("/contribute");
+  await expect(page.getByRole("heading", { name: "BgGone is open source." })).toBeVisible();
+  await expect(page.getByRole("link", { name: "View BgGone repository on GitHub" })).toHaveAttribute(
+    "href",
+    "https://github.com/git-dariel/BgGone",
   );
-  await page.route("**/v1/keys/key-1/usage", (route) =>
-    route.fulfill({
-      status: 200,
-      contentType: "application/json",
-      body: JSON.stringify({
-        id: "key-1",
-        month: "2026-09",
-        used: 3,
-        monthly_quota: 10000,
-        created_at: "2026-09-01",
-        revoked_at: null,
-      }),
-      headers: { "Access-Control-Allow-Origin": "*" },
-    }),
-  );
-  await page.route("**/v1/keys/key-1", (route) =>
-    route.fulfill({ status: 204, headers: { "Access-Control-Allow-Origin": "*" } }),
-  );
-  await page.goto("/api");
-  await page.getByLabel("Admin token").fill("admin-test");
-  await page.getByRole("button", { name: "Generate API key" }).click();
-  await expect(page.getByRole("dialog", { name: "Your new API key" })).toContainText("rb-secret");
-  await page.getByRole("button", { name: "Done" }).click();
-  await page.getByRole("button", { name: /View usage/ }).click();
-  await expect(page.getByText(/3\s*\/\s*10,000/)).toBeVisible();
-  await page.getByRole("button", { name: "Revoke", exact: true }).click();
-  await page.getByRole("dialog", { name: "Revoke this API key?" }).getByRole("button", { name: "Revoke key" }).click();
-  await expect(page.getByText("Revoked", { exact: true })).toBeVisible();
+});
+
+test("removed API and self-host routes return the missing page", async ({ page }) => {
+  for (const path of ["/api", "/self-host"]) {
+    await page.goto(path);
+    await expect(page.getByRole("heading", { name: "Nothing to cut out here." })).toBeVisible();
+  }
 });
 
 test("dark theme and mobile navigation remain accessible", async ({ page }) => {

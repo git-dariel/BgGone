@@ -15,8 +15,7 @@ export function SiteFooter() {
         </div>
         <nav aria-label="Footer navigation">
           <Link href="/batch">Batch</Link>
-          <Link href="/api">API</Link>
-          <Link href="/self-host">Self-host</Link>
+          <Link href="/contribute">Contribute</Link>
           {GITHUB_REPO_URL && (
             <a href={GITHUB_REPO_URL} target="_blank" rel="noopener noreferrer">
               GitHub <ArrowUpRight size={14} />

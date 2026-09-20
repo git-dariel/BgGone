@@ -1,4 +1,4 @@
-import { ArrowUpRight, Box, Images, LockKeyhole, WandSparkles } from "lucide-react";
+import { Accessibility, ArrowUpRight, Box, GitPullRequest, Images, WandSparkles } from "lucide-react";
 import Link from "next/link";
 import Workspace from "@/components/workspace";
 import { GITHUB_REPO_URL } from "@/lib/config";
@@ -68,35 +68,33 @@ export default function Home() {
       </section>
       <section className="closing-grid page-shell">
         <div className="closing-cell">
-          <LockKeyhole size={27} />
-          <span className="mini-label">PRIVACY, PLAINLY</span>
+          <Accessibility size={27} />
+          <span className="mini-label">OPEN TO EVERYONE</span>
           <h2>
-            Your images,
+            Make BgGone
             <br />
-            your call.
+            more accessible.
           </h2>
           <p>
-            A single image is processed in memory. Batch files are kept temporarily and expire automatically. Host the
-            API yourself if you need complete control.
+            Help improve keyboard access, screen-reader support, contrast, and the experience on every device.
           </p>
-          <Link href="/self-host">
-            Self-hosting guide <ArrowUpRight size={17} />
+          <Link href="/contribute">
+            See how to contribute <ArrowUpRight size={17} />
           </Link>
         </div>
         <div className="closing-cell">
-          <span className="api-glyph">{`{ }`}</span>
-          <span className="mini-label">BUILT FOR DEVELOPERS</span>
+          <GitPullRequest size={27} />
+          <span className="mini-label">BUILT IN PUBLIC</span>
           <h2>
-            Make it part
+            Better cuts.
             <br />
-            of your flow.
+            More possibilities.
           </h2>
           <p>
-            Use the same endpoints behind this studio in your own product. Image edits, masks, batch jobs, and keys are
-            documented.
+            Contribute fixes, edge-quality improvements, thoughtful features, or clearer documentation on GitHub.
           </p>
-          <Link href="/api">
-            Explore the API <ArrowUpRight size={17} />
+          <Link href="/contribute">
+            Join the project <ArrowUpRight size={17} />
           </Link>
         </div>
       </section>
